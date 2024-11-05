@@ -38,6 +38,8 @@ def ldflags():
     ldflags = sysconfig.get_config_var('LDFLAGS')
     ldversion = sysconfig.get_config_var('LDVERSION')
     ldflags += f' -lpython{ldversion}'
+    ldflags += f' -L{sysconfig.get_config_var("LIBDIR")}'
+    ldflags += f' {sysconfig.get_config_var("LIBS")}'
 
     return ldflags.split()
 
