@@ -27,6 +27,20 @@
 #include <stdbool.h>
 #include "pyfuzzer_common.h"
 
+static PyObject* builtins_module = NULL;
+static PyObject* print_method = NULL;
+
+static int init_builtins(void) {
+    builtins_module = PyImport_ImportModule("builtins");
+    if (builtins_module == NULL) {
+        return 0;
+    }
+
+    print_method = PyObject_GetAttrString(builtins_module, "print");
+
+    return print_method != NULL;
+}
+
 static void *read_unit(const char *unit_path_p, Py_ssize_t *size_p)
 {
     void *buf_p;
@@ -91,7 +105,15 @@ static void print_unit(PyObject *test_one_input_print_p,
     Py_ssize_t size;
     void *buf_p;
 
-    printf("%s:\n", path_p);
+    PyObject* path_p_object = PyUnicode_FromString(path_p);
+    if (path_p_object == NULL) {
+        PyErr_Print();
+        abort();
+    }
+    PyObject* print_result = PyObject_CallOneArg(print_method, path_p_object);
+    
+    Py_DECREF(print_result);
+    Py_DECREF(path_p_object);
 
     buf_p = read_unit(path_p, &size);
     args_p = PyTuple_Pack(1, PyBytes_FromStringAndSize((const char *)buf_p, size));
@@ -169,6 +191,11 @@ int main(int argc, const char *argv[])
     }
 
     pyfuzzer_init(NULL, NULL, &test_one_input_print_p);
+    
+    if (!init_builtins()) {
+        fprintf(stderr, "Getting builtins.print failed.\n");
+        exit(1);
+    }
 
     while (true) {
         path_p = fgets(&path[0], sizeof(path), stdin);
@@ -179,6 +206,9 @@ int main(int argc, const char *argv[])
 
         print_unit(test_one_input_print_p, strip(path_p, NULL));
     }
+    
+    Py_DECREF(print_method);
+    Py_DECREF(builtins_module);
 
     return (0);
 }
