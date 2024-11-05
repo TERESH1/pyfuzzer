@@ -267,6 +267,7 @@ def is_function(member):
 
 
 def lookup_functions(module):
+    print(f'{inspect.getmembers(module, is_function) = }')
     return [
         (m[1], get_signature(m[1]))
         for m in inspect.getmembers(module, is_function)
@@ -282,6 +283,7 @@ def lookup_class_methods(cls):
 
 
 def lookup_classes(module):
+    print(f'{inspect.getmembers(module, inspect.isclass) = }')
     return [
         (cls, get_signature(cls), lookup_class_methods(cls))
         for _, cls in inspect.getmembers(module, inspect.isclass)
@@ -302,6 +304,9 @@ class Mutator:
         }
         self._functions = lookup_functions(module)
         self._classes = lookup_classes(module)
+        print(f'{self._module = }')
+        print(f'{self._functions = }')
+        print(f'{self._classes = }')
 
     def test_one_input(self, data):
         data = BytesIO(data)
