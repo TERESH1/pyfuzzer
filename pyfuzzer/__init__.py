@@ -158,10 +158,10 @@ def do_run(args):
         module_name = os.path.splitext(filename)[0]
     else:
         module_name = args.module_name
-
-    generate(module_name, args.mutator)
-    build(args.csources, args.cflag)
-    build_print(args.csources, args.cflag)
+    if args.skip_build != True:
+        generate(module_name, args.mutator)
+        build(args.csources, args.cflag)
+        build_print(args.csources, args.cflag)
     run(args.libfuzzer_argument)
 
 
@@ -244,6 +244,9 @@ def main():
         '-M', '--module-name',
         help=('C extension module name, or first C source filename without '
               'extension if not given.'))
+    subparser.add_argument(
+        '-S', '--skip-build', action='store_true',
+        help=('Run without building'))
     subparser.add_argument('csources', nargs='+', help='C extension source files.')
     subparser.set_defaults(func=do_run)
 
