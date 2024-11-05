@@ -130,7 +130,7 @@ def run(libfuzzer_arguments):
         'corpus',
         '-print_final_stats=1'
     ]
-    command += [f'-{a}' for a in libfuzzer_arguments]
+    command += [f'{a}' for a in libfuzzer_arguments]
     env = os.environ.copy()
     env['LLVM_PROFILE_FILE'] = 'pyfuzzer.profraw'
     run_command(command, env=env)
@@ -233,7 +233,7 @@ def main():
         '-l', '--libfuzzer-argument',
         action='append',
         default=[],
-        help="Add a libFuzzer command line argument without its leading '-'.")
+        help="Add a libFuzzer command line argument.")
     subparser.add_argument(
         '-c', '--cflag',
         action='append',
