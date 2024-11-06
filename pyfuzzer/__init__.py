@@ -57,11 +57,6 @@ def generate(module_name, mutator):
     if mutator is not None:
         shutil.copyfile(mutator, 'mutator.py')
 
-
-def format_cflags(cflags):
-    return [f'-{cflag}' for cflag in cflags if cflag]
-
-
 def build(csources, cflags):
     command = ['clang']
     command += [
@@ -73,7 +68,7 @@ def build(csources, cflags):
     ]
 
     if cflags:
-        command += format_cflags(cflags)
+        command += cflags
     else:
         command += [
             '-fsanitize=undefined',
@@ -106,7 +101,7 @@ def build_print(csources, cflags):
     command += [
         '-DCYTHON_PEP489_MULTI_PHASE_INIT=0'
     ]
-    command += format_cflags(cflags)
+    command += cflags
     command += includes()
     command += csources
     command += [
@@ -238,7 +233,7 @@ def main():
         '-c', '--cflag',
         action='append',
         default=[],
-        help=("Add a C extension compilation flag without its leading '-'. If "
+        help=("Add a C extension compilation flag. If "
               "given, all default sanitizers are removed."))
     subparser.add_argument(
         '-M', '--module-name',
