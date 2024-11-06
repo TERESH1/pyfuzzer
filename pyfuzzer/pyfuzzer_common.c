@@ -26,25 +26,14 @@
 
 #include "pyfuzzer_common.h"
 
-extern PyObject *pyfuzzer_module_init(void);
+#ifndef MODINIT_FUNC
+#   define MODINIT_FUNC PyInit_pyfuzzer_fuzzable_module
+#endif
 
-static PyObject *import_module_under_test(void)
-{
-    PyObject *module_p;
+#define STR_VALUE(arg)      #arg
+#define MODINIT_FUNC_NAME STR_VALUE(MODINIT_FUNC)
 
-    printf("Importing module under test... ");
-    module_p = pyfuzzer_module_init();
-
-    if (module_p != NULL) {
-        printf("done.\n");
-    } else {
-        printf("failed.\n");
-        PyErr_Print();
-        exit(1);
-    }
-
-    return (module_p);
-}
+extern PyObject *MODINIT_FUNC(void);
 
 static PyObject *import_mutator_module(void)
 {
@@ -178,9 +167,19 @@ void pyfuzzer_init(PyObject **test_one_input_pp,
     PyObject *setup_p;
     PyObject *mutator_p;
 
+    if (PyImport_AppendInittab("pyfuzzer_fuzzable_module", MODINIT_FUNC) == -1) {
+        fprintf(stderr, "Error: could not extend in-built modules table with" MODINIT_FUNC_NAME "\n");
+        exit(1);
+    }
+
     Py_Initialize();
 
-    module_under_test_p = import_module_under_test();
+    module_under_test_p = PyImport_ImportModule("pyfuzzer_fuzzable_module");
+    if (!module_under_test_p) {
+        PyErr_Print();
+        fprintf(stderr, "Error: could not import module 'pyfuzzer_fuzzable_module'\n");
+    }
+
     mutator_module_p = import_mutator_module();
     setup_p = find_setup_function(mutator_module_p);
     mutator_p = call_setup_function(setup_p, module_under_test_p);

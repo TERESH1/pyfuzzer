@@ -11,18 +11,6 @@ from .version import __version__
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-MODULE_SRC = '''\
-#include <Python.h>
-
-extern PyMODINIT_FUNC PyInit_{module_name}(void);
-
-PyMODINIT_FUNC pyfuzzer_module_init(void)
-{{
-    return (PyInit_{module_name}());
-}}
-'''
-
-
 def mkdir_p(name):
     if not os.path.exists(name):
         os.makedirs(name)
@@ -50,21 +38,19 @@ def run_command(command, env=None):
     subprocess.check_call(command, env=env)
 
 
-def generate(module_name, mutator):
-    with open('module.c', 'w') as fout:
-        fout.write(MODULE_SRC.format(module_name=module_name))
-
+def generate(mutator):
     if mutator is not None:
         shutil.copyfile(mutator, 'mutator.py')
 
-def build(csources, cflags):
+def build(csources, cflags, modinit_func):
     command = ['clang']
     command += [
         '-fprofile-instr-generate',
         '-fcoverage-mapping',
         '-g',
         '-fsanitize=fuzzer',
-        '-DCYTHON_PEP489_MULTI_PHASE_INIT=0'
+        '-DCYTHON_PEP489_MULTI_PHASE_INIT=0',
+        f'-DMODINIT_FUNC={modinit_func}'
     ]
 
     if cflags:
@@ -84,7 +70,6 @@ def build(csources, cflags):
     command += includes()
     command += csources
     command += [
-        'module.c',
         os.path.join(SCRIPT_DIR, 'pyfuzzer_common.c'),
         os.path.join(SCRIPT_DIR, 'pyfuzzer.c')
     ]
@@ -96,16 +81,16 @@ def build(csources, cflags):
     run_command(command)
 
 
-def build_print(csources, cflags):
+def build_print(csources, cflags, modinit_func):
     command = ['clang']
     command += [
-        '-DCYTHON_PEP489_MULTI_PHASE_INIT=0'
+        '-DCYTHON_PEP489_MULTI_PHASE_INIT=0',
+        f'-DMODINIT_FUNC={modinit_func}'
     ]
     command += cflags
     command += includes()
     command += csources
     command += [
-        'module.c',
         os.path.join(SCRIPT_DIR, 'pyfuzzer_common.c'),
         os.path.join(SCRIPT_DIR, 'pyfuzzer_print.c')
     ]
@@ -148,15 +133,16 @@ def print_coverage():
 
 
 def do_run(args):
-    if args.module_name is None:
+    if args.modinit_func is None:
         filename = os.path.basename(args.csources[0])
-        module_name = os.path.splitext(filename)[0]
+        filename_base = os.path.splitext(filename)[0]
+        modinit_func = f'PyInit_{filename_base}'
     else:
-        module_name = args.module_name
+        modinit_func = args.modinit_func
     if args.skip_build != True:
-        generate(module_name, args.mutator)
-        build(args.csources, args.cflag)
-        build_print(args.csources, args.cflag)
+        generate(args.mutator)
+        build(args.csources, args.cflag, modinit_func)
+        build_print(args.csources, args.cflag, modinit_func)
     run(args.libfuzzer_argument)
 
 
@@ -236,8 +222,8 @@ def main():
         help=("Add a C extension compilation flag. If "
               "given, all default sanitizers are removed."))
     subparser.add_argument(
-        '-M', '--module-name',
-        help=('C extension module name, or first C source filename without '
+        '-M', '--modinit_func',
+        help=('C extension module PyMODINIT_FUNC function, or first C source PyInit_{filename} without '
               'extension if not given.'))
     subparser.add_argument(
         '-S', '--skip-build', action='store_true',

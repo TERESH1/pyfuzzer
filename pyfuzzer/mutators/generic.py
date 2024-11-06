@@ -283,10 +283,13 @@ def lookup_class_methods(cls):
 
 
 def lookup_classes(module):
-    print(f'{inspect.getmembers(module, inspect.isclass) = }')
+    classes = inspect.getmembers(module, inspect.isclass)
+
+    print(f'{classes = }')
     return [
         (cls, get_signature(cls), lookup_class_methods(cls))
-        for _, cls in inspect.getmembers(module, inspect.isclass)
+        # skip __loader__
+        for attr, cls in classes if not attr == '__loader__'
     ]
 
 
