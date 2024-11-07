@@ -150,7 +150,8 @@ def do_build(args):
     else:
         modinit_func = args.modinit_func
     build(args.csources, modinit_func)
-    build_print(args.csources, modinit_func)
+    if not args.fuzzer_only:
+        build_print(args.csources, modinit_func)
 
 
 def do_print_corpus(args):
@@ -232,6 +233,9 @@ def main():
         '-M', '--modinit_func',
         help=('C extension module PyMODINIT_FUNC function, or first C source PyInit_{filename} without '
               'extension if not given.'))
+    subparser.add_argument(
+        '-F', '--fuzzer-only', action='store_true',
+        help=('Build without print'))
     subparser.add_argument('csources', nargs='+', help='C extension source files.')
     subparser.set_defaults(func=do_build)
 
