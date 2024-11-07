@@ -138,17 +138,19 @@ def print_coverage():
 
 
 def do_run(args):
+    generate(args.mutator)
+    run(args.libfuzzer_argument)
+
+
+def do_build(args):
     if args.modinit_func is None:
         filename = os.path.basename(args.csources[0])
         filename_base = os.path.splitext(filename)[0]
         modinit_func = f'PyInit_{filename_base}'
     else:
         modinit_func = args.modinit_func
-    if args.skip_build != True:
-        generate(args.mutator)
-        build(args.csources, modinit_func)
-        build_print(args.csources, modinit_func)
-    run(args.libfuzzer_argument)
+    build(args.csources, modinit_func)
+    build_print(args.csources, modinit_func)
 
 
 def do_print_corpus(args):
@@ -213,22 +215,25 @@ def main():
     # The run subparser.
     subparser = subparsers.add_parser(
         'run',
-        description='Build and run the fuzz tester.')
+        description='Run the fuzz tester.')
     subparser.add_argument('-m', '--mutator', help='Mutator module.')
     subparser.add_argument(
         '-l', '--libfuzzer-argument',
         action='append',
         default=[],
         help="Add a libFuzzer command line argument.")
+    subparser.set_defaults(func=do_run)
+
+    # The build subparser.
+    subparser = subparsers.add_parser(
+        'build',
+        description='Build the fuzz tester.')
     subparser.add_argument(
         '-M', '--modinit_func',
         help=('C extension module PyMODINIT_FUNC function, or first C source PyInit_{filename} without '
               'extension if not given.'))
-    subparser.add_argument(
-        '-S', '--skip-build', action='store_true',
-        help=('Run without building'))
     subparser.add_argument('csources', nargs='+', help='C extension source files.')
-    subparser.set_defaults(func=do_run)
+    subparser.set_defaults(func=do_build)
 
     # The print_coverage subparser.
     subparser = subparsers.add_parser('print_coverage',
