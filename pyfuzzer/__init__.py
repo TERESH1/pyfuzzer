@@ -11,6 +11,11 @@ from .version import __version__
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
+CFLAGS = os.getenv('CFLAGS', None)
+LDFLAGS = os.getenv('LDFLAGS', None)
+CC = os.getenv('CC', 'clang')
+LIB_FUZZING_ENGINE = os.getenv('LIB_FUZZING_ENGINE', '-fsanitize=fuzzer')
+
 def mkdir_p(name):
     if not os.path.exists(name):
         os.makedirs(name)
@@ -28,7 +33,8 @@ def ldflags():
     ldflags += f' -lpython{ldversion}'
     ldflags += f' -L{sysconfig.get_config_var("LIBDIR")}'
     ldflags += f' {sysconfig.get_config_var("LIBS")}'
-
+    if LDFLAGS:
+        ldflags += LDFLAGS
     return ldflags.split()
 
 
@@ -42,21 +48,20 @@ def generate(mutator):
     if mutator is not None:
         shutil.copyfile(mutator, 'mutator.py')
 
-def build(csources, cflags, modinit_func):
-    command = ['clang']
+def build(csources, modinit_func):
+    command = [ CC ]
     command += [
-        '-fprofile-instr-generate',
-        '-fcoverage-mapping',
-        '-g',
-        '-fsanitize=fuzzer',
-        '-DCYTHON_PEP489_MULTI_PHASE_INIT=0',
+        LIB_FUZZING_ENGINE,
         f'-DMODINIT_FUNC={modinit_func}'
     ]
 
-    if cflags:
-        command += cflags
+    if CFLAGS:
+        command += CFLAGS.split()
     else:
         command += [
+            '-fprofile-instr-generate',
+            '-fcoverage-mapping',
+            '-g',
             '-fsanitize=undefined',
             '-fsanitize=signed-integer-overflow',
             '-fsanitize=alignment',
@@ -81,13 +86,13 @@ def build(csources, cflags, modinit_func):
     run_command(command)
 
 
-def build_print(csources, cflags, modinit_func):
-    command = ['clang']
+def build_print(csources, modinit_func):
+    command = [ CC ]
     command += [
-        '-DCYTHON_PEP489_MULTI_PHASE_INIT=0',
-        f'-DMODINIT_FUNC={modinit_func}'
+        f'-DMODINIT_FUNC={modinit_func}',
     ]
-    command += cflags
+    if CFLAGS:
+        command += CFLAGS.split()
     command += includes()
     command += csources
     command += [
@@ -110,7 +115,7 @@ def run(libfuzzer_arguments):
         'corpus',
         '-print_final_stats=1'
     ]
-    command += [f'{a}' for a in libfuzzer_arguments]
+    command += libfuzzer_arguments
     env = os.environ.copy()
     env['LLVM_PROFILE_FILE'] = 'pyfuzzer.profraw'
     run_command(command, env=env)
@@ -141,8 +146,8 @@ def do_run(args):
         modinit_func = args.modinit_func
     if args.skip_build != True:
         generate(args.mutator)
-        build(args.csources, args.cflag, modinit_func)
-        build_print(args.csources, args.cflag, modinit_func)
+        build(args.csources, modinit_func)
+        build_print(args.csources, modinit_func)
     run(args.libfuzzer_argument)
 
 
@@ -215,12 +220,6 @@ def main():
         action='append',
         default=[],
         help="Add a libFuzzer command line argument.")
-    subparser.add_argument(
-        '-c', '--cflag',
-        action='append',
-        default=[],
-        help=("Add a C extension compilation flag. If "
-              "given, all default sanitizers are removed."))
     subparser.add_argument(
         '-M', '--modinit_func',
         help=('C extension module PyMODINIT_FUNC function, or first C source PyInit_{filename} without '
