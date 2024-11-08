@@ -48,7 +48,7 @@ def generate(mutator):
     if mutator is not None:
         shutil.copyfile(mutator, 'mutator.py')
 
-def build(csources, modinit_func):
+def build(csources, modinit_func, output):
     command = [ CC ]
     command += [
         LIB_FUZZING_ENGINE,
@@ -80,13 +80,13 @@ def build(csources, modinit_func):
     ]
     command += ldflags()
     command += [
-        '-o', 'pyfuzzer'
+        '-o', output
     ]
 
     run_command(command)
 
 
-def build_print(csources, modinit_func):
+def build_print(csources, modinit_func, output):
     command = [ CC ]
     command += [
         f'-DMODINIT_FUNC={modinit_func}',
@@ -101,45 +101,45 @@ def build_print(csources, modinit_func):
     ]
     command += ldflags()
     command += [
-        '-o', 'pyfuzzer_print'
+        '-o', f'{output}_print'
     ]
 
     run_command(command)
 
 
-def run(libfuzzer_arguments):
-    run_command(['rm', '-f', 'pyfuzzer.profraw'])
+def run(libfuzzer_arguments, bin):
+    run_command(['rm', '-f', f'{bin}.profraw'])
     mkdir_p('corpus')
     command = [
-        './pyfuzzer',
+        bin,
         'corpus',
         '-print_final_stats=1'
     ]
     command += libfuzzer_arguments
     env = os.environ.copy()
-    env['LLVM_PROFILE_FILE'] = 'pyfuzzer.profraw'
+    env['LLVM_PROFILE_FILE'] = f'{bin}.profraw'
     run_command(command, env=env)
 
 
-def print_coverage():
+def print_coverage(bin):
     run_command([
         'llvm-profdata',
         'merge',
-        '-sparse', 'pyfuzzer.profraw',
-        '-o', 'pyfuzzer.profdata'
+        '-sparse', f'{bin}.profraw',
+        '-o', f'{bin}.profdata'
     ])
     run_command([
         'llvm-cov',
         'show',
-        'pyfuzzer',
-        '-instr-profile=pyfuzzer.profdata',
-        '-ignore-filename-regex=/usr/|pyfuzzer.c|module.c'
+        bin,
+        f'-instr-profile={bin}.profdata',
+        '-ignore-filename-regex=/usr/|pyfuzzer.c'
     ])
 
 
 def do_run(args):
     generate(args.mutator)
-    run(args.libfuzzer_argument)
+    run(args.libfuzzer_argument, args.bin)
 
 
 def do_build(args):
@@ -149,9 +149,9 @@ def do_build(args):
         modinit_func = f'PyInit_{filename_base}'
     else:
         modinit_func = args.modinit_func
-    build(args.csources, modinit_func)
+    build(args.csources, modinit_func, args.output)
     if not args.fuzzer_only:
-        build_print(args.csources, modinit_func)
+        build_print(args.csources, modinit_func, args.output)
 
 
 def do_print_corpus(args):
@@ -162,7 +162,7 @@ def do_print_corpus(args):
 
     paths = '\n'.join(filenames)
 
-    subprocess.run(['./pyfuzzer_print'], input=paths.encode('utf-8'), check=True)
+    subprocess.run([args.bin_print], input=paths.encode('utf-8'), check=True)
 
 
 def do_print_crashes(args):
@@ -172,7 +172,7 @@ def do_print_crashes(args):
         filenames = glob.glob('crash-*')
 
     for filename in filenames:
-        proc = subprocess.run(['./pyfuzzer_print'], input=filename.encode('utf-8'))
+        proc = subprocess.run([args.bin_print], input=filename.encode('utf-8'))
         print()
 
         try:
@@ -181,8 +181,8 @@ def do_print_crashes(args):
             print(e)
 
 
-def do_print_coverage(_args):
-    print_coverage()
+def do_print_coverage(args):
+    print_coverage(args.bin)
 
 
 def do_clean(_args):
@@ -223,6 +223,7 @@ def main():
         action='append',
         default=[],
         help="Add a libFuzzer command line argument.")
+    subparser.add_argument('bin', nargs='?', help='fuzzer binary', default='./pyfuzzer')
     subparser.set_defaults(func=do_run)
 
     # The build subparser.
@@ -234,6 +235,9 @@ def main():
         help=('C extension module PyMODINIT_FUNC function, or first C source PyInit_{filename} without '
               'extension if not given.'))
     subparser.add_argument(
+        '-o', '--output',
+        help=('Output executable'), default='./pyfuzzer')
+    subparser.add_argument(
         '-F', '--fuzzer-only', action='store_true',
         help=('Build without print'))
     subparser.add_argument('csources', nargs='+', help='C extension source files.')
@@ -242,6 +246,7 @@ def main():
     # The print_coverage subparser.
     subparser = subparsers.add_parser('print_coverage',
                                       description='Print code coverage.')
+    subparser.add_argument('bin', nargs='?', help='fuzzer binary', default='./pyfuzzer')
     subparser.set_defaults(func=do_print_coverage)
 
     # The print_corpus subparser.
@@ -249,6 +254,7 @@ def main():
         'print_corpus',
         description=('Print corpus units as Python functions with arguments and '
                      'return value or exception.'))
+    subparser.add_argument('bin_print', nargs='?', help='fuzzer print binary', default='./pyfuzzer_print')
     subparser.add_argument('units',
                            nargs='*',
                            help='Units to print, or whole corpus if none given.')
@@ -257,6 +263,7 @@ def main():
     # The print_crashes subparser.
     subparser = subparsers.add_parser('print_crashes',
                                       description='Print all crashes.')
+    subparser.add_argument('bin_print', nargs='?', help='fuzzer print binary', default='./pyfuzzer_print')
     subparser.add_argument('units',
                            nargs='*',
                            help='Crashes to print, or all if none given.')
