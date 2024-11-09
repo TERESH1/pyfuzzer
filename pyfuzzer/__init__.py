@@ -34,7 +34,7 @@ def ldflags():
     ldflags += f' -L{sysconfig.get_config_var("LIBDIR")}'
     ldflags += f' {sysconfig.get_config_var("LIBS")}'
     if LDFLAGS:
-        ldflags += LDFLAGS
+        ldflags += f' {LDFLAGS}'
     return ldflags.split()
 
 
