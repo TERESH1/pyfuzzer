@@ -26,16 +26,27 @@
 
 #include "pyfuzzer_common.h"
 
+
+static PyObject *test_one_input_p = NULL;
+static PyObject *args_p;
+
+int LLVMFuzzerInitialize(int *argc, char ***argv) {
+    (void) argc;
+    (void) argv;
+
+    pyfuzzer_init(&test_one_input_p, &args_p, NULL);
+
+    if (test_one_input_p == NULL || args_p == NULL) {
+        abort();
+    }
+
+    return 0;
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t *data_p, size_t size)
 {
-    static PyObject *test_one_input_p = NULL;
-    static PyObject *args_p;
     PyObject *res_p;
     PyObject *data_obj_p;
-
-    if (test_one_input_p == NULL) {
-        pyfuzzer_init(&test_one_input_p, &args_p, NULL);
-    }
 
     data_obj_p = PyBytes_FromStringAndSize((const char *)data_p, size);
 
